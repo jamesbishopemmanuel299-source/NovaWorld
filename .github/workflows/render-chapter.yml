@@ -30,7 +30,9 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y blender ffmpeg
+          sudo apt-get install -y blender ffmpeg libegl1 libgl1 libglib2.0-0 libx11-6 libxext6 libxrender1 libxi6 libxxf86vm1 libxfixes3 libsm6 libxkbcommon0
+          # Confirm Blender's EGL runtime dependency is available before rendering.
+          ldconfig -p | grep -F 'libEGL.so.1'
           blender --version
           ffmpeg -version | head -n 1
 
