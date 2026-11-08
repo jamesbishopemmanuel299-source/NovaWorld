@@ -48,11 +48,22 @@ def create_character(prefix, x, body_mat, accent_mat, t0, frames):
     head=ico(prefix+"_head",(x,0,2.35),(0.48,0.43,0.48),body_mat)
     ico(prefix+"_hair",(x,0.02,2.68),(0.49,0.43,0.22),accent_mat)
     ico(prefix+"_scarf",(x,-0.02,1.95),(0.48,0.31,0.16),accent_mat)
+    limbs = []
     for side in (-1,1):
         arm=ico(prefix+"_arm_"+str(side),(x+side*0.48,0,1.55),(0.16,0.18,0.48),body_mat)
         leg=ico(prefix+"_leg_"+str(side),(x+side*0.2,0,0.62),(0.19,0.22,0.48),accent_mat)
         arm.rotation_euler[1]=side*0.15
         leg.rotation_euler[1]=side*0.08
+        limbs.append((arm, leg, side))
+    # Gentle alternating walk-cycle motion on arms and legs.
+    cycle_frames = (1, max(2, frames // 4), max(3, frames // 2), max(4, (frames * 3) // 4), frames)
+    for arm, leg, side in limbs:
+        for index, frame in enumerate(cycle_frames):
+            phase = math.sin((index / 4.0) * math.tau)
+            arm.rotation_euler[1] = side * 0.15 + side * phase * 0.22
+            leg.rotation_euler[1] = side * 0.08 - side * phase * 0.18
+            arm.keyframe_insert(data_path="rotation_euler", frame=frame)
+            leg.keyframe_insert(data_path="rotation_euler", frame=frame)
     # Friendly eyes, no realistic human likeness.
     for side in (-1,1):
         ico(prefix+"_eye_"+str(side),(x+side*0.17,-0.405,2.4),(0.055,0.035,0.075),accent_mat,1)
@@ -107,6 +118,10 @@ def build_scene(chapter, frames):
     target=Vector((0,3,2.0)); direction=target-cam.location
     cam.rotation_euler=direction.to_track_quat("-Z","Y").to_euler()
     cam.data.lens=42; bpy.context.scene.camera=cam
+    # Slow cinematic camera drift across the establishing shot.
+    for frame, offset in ((1, -0.8), (frames // 2, 0.0), (frames, 0.8)):
+        cam.location.x = offset
+        cam.keyframe_insert(data_path="location", frame=frame)
     # Soft key and rim lighting.
     bpy.ops.object.light_add(type="AREA", location=(-5,-6,11))
     key=bpy.context.object; key.data.energy=1800; key.data.shape="DISK"; key.data.size=9
