@@ -117,8 +117,19 @@ def build_scene(chapter, frames):
     world.node_tree.nodes["Background"].inputs[1].default_value=0.45
     scene=bpy.context.scene
     scene.frame_start=1; scene.frame_end=frames
-    scene.render.engine="BLENDER_EEVEE_NEXT"
-    scene.eevee.taa_render_samples=16
+    # Select the Eevee engine identifier supported by the installed Blender build.
+    engine_items = scene.render.bl_rna.properties["engine"].enum_items
+    engine_ids = {item.identifier for item in engine_items}
+    if "BLENDER_EEVEE_NEXT" in engine_ids:
+        scene.render.engine = "BLENDER_EEVEE_NEXT"
+    elif "BLENDER_EEVEE" in engine_ids:
+        scene.render.engine = "BLENDER_EEVEE"
+    else:
+        raise RuntimeError("No supported Eevee render engine found. Available: " + ", ".join(sorted(engine_ids)))
+    # Blender versions expose different Eevee sample properties.
+    eevee_settings = getattr(scene, "eevee", None)
+    if eevee_settings is not None and hasattr(eevee_settings, "taa_render_samples"):
+        eevee_settings.taa_render_samples = 16
     scene.render.resolution_x=1280; scene.render.resolution_y=720
     scene.render.resolution_percentage=50
     scene.render.fps=24
