@@ -28,13 +28,35 @@ jobs:
 
       - name: Install Blender and FFmpeg
         run: |
+          set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y blender ffmpeg
+          blender --version
+          ffmpeg -version | head -n 1
 
       - name: Render chapter preview
+        shell: bash
+        env:
+          CHAPTER: ${{ inputs.chapter }}
+          FRAMES: ${{ inputs.frames }}
         run: |
+          set -euo pipefail
           mkdir -p renders
-          blender --background --python blender/create_film.py --             --chapter "${{ inputs.chapter }}"             --frames "${{ inputs.frames }}"             --output "renders/novaworld_chapter_${{ inputs.chapter }}.mp4"
+          OUTPUT="$PWD/renders/novaworld_chapter_${CHAPTER}.mp4"
+          echo "Rendering chapter ${CHAPTER}, ${FRAMES} frames to: $OUTPUT"
+          blender --background --python-exit-code 1 --python blender/create_film.py -- \
+            --chapter "$CHAPTER" \
+            --frames "$FRAMES" \
+            --output "$OUTPUT"
+          echo "Checking rendered output..."
+          if [[ ! -s "$OUTPUT" ]]; then
+            echo "::error::Blender finished without creating the expected MP4: $OUTPUT"
+            echo "Files currently in renders/:"
+            find renders -maxdepth 2 -type f -printf '%p (%s bytes)\\n' || true
+            exit 1
+          fi
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 "$OUTPUT"
+          ls -lh "$OUTPUT"
 
       - name: Upload rendered MP4
         uses: actions/upload-artifact@v4
