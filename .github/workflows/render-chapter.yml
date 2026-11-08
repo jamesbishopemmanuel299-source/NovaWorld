@@ -1,0 +1,45 @@
+name: Render NovaWorld chapter
+
+on:
+  workflow_dispatch:
+    inputs:
+      chapter:
+        description: "Chapter number (1-12)"
+        required: true
+        default: "1"
+        type: choice
+        options: ["1","2","3","4","5","6","7","8","9","10","11","12"]
+      frames:
+        description: "Frames to render (24 fps; 480 = 20 seconds)"
+        required: true
+        default: "480"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Install Blender and FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender ffmpeg
+
+      - name: Render chapter preview
+        run: |
+          mkdir -p renders
+          blender --background --python blender/create_film.py --             --chapter "${{ inputs.chapter }}"             --frames "${{ inputs.frames }}"             --output "renders/novaworld_chapter_${{ inputs.chapter }}.mp4"
+
+      - name: Upload rendered MP4
+        uses: actions/upload-artifact@v4
+        with:
+          name: novaworld-chapter-${{ inputs.chapter }}
+          path: renders/novaworld_chapter_${{ inputs.chapter }}.mp4
+          if-no-files-found: error
+          retention-days: 7
