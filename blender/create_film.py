@@ -2,6 +2,7 @@ import bpy
 import math
 import argparse
 import os
+import subprocess
 from mathutils import Vector
 
 def args_after_separator():
@@ -134,20 +135,35 @@ def build_scene(chapter, frames):
     scene.render.resolution_percentage=50
     scene.render.fps=24
     scene.view_settings.view_transform="AgX"
-    scene.render.image_settings.file_format="FFMPEG"
-    scene.render.ffmpeg.format="MPEG4"
-    scene.render.ffmpeg.codec="H264"
-    scene.render.ffmpeg.constant_rate_factor="MEDIUM"
-    scene.render.filepath="//chapter"
+    # Blender 5.0 no longer exposes FFMPEG as an image_settings format.
+    # Render PNG frames, then encode them into MP4 with the system FFmpeg.
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.image_settings.color_mode = "RGB"
+    scene.render.filepath = "//frame_"
     scene.frame_set(1)
 
 def main():
     args=args_after_separator()
     os.makedirs(os.path.dirname(args.output) or ".",exist_ok=True)
     build_scene(args.chapter,args.frames)
-    scene=bpy.context.scene
-    scene.render.filepath=os.path.abspath(args.output)
+    scene = bpy.context.scene
+    output_path = os.path.abspath(args.output)
+    frame_dir = os.path.join(os.path.dirname(output_path), "chapter_" + str(args.chapter) + "_frames")
+    os.makedirs(frame_dir, exist_ok=True)
+    scene.render.filepath = os.path.join(frame_dir, "frame_")
     bpy.ops.render.render(animation=True)
+
+    # Encode the rendered PNG sequence into a broadly compatible H.264 MP4.
+    frame_pattern = os.path.join(frame_dir, "frame_%04d.png")
+    command = [
+        "ffmpeg", "-y", "-framerate", str(scene.render.fps),
+        "-i", frame_pattern,
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart", output_path
+    ]
+    subprocess.run(command, check=True)
+    if not os.path.isfile(output_path) or os.path.getsize(output_path) == 0:
+        raise RuntimeError("FFmpeg did not create a non-empty MP4: " + output_path)
 
 if __name__=="__main__":
     main()
